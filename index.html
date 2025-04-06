@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Real-Time English to Braille with Audio</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      background: linear-gradient(to right, #a1c4fd, #c2e9fb);
+      padding: 20px;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 28px;
+    }
+
+    video, canvas {
+      border: 3px solid #444;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      max-width: 100%;
+    }
+
+    #output {
+      margin-top: 20px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #222;
+    }
+
+    .controls {
+      margin-top: 15px;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      margin: 8px;
+      font-size: 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .toggle-btn {
+      background-color: #444;
+      padding: 12px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      font-size: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s ease, background-color 0.3s ease;
+    }
+
+    .toggle-btn:hover {
+      transform: rotate(180deg);
+      background-color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>📸 Real-Time English to Braille + Audio</h1>
+  <video id="video" width="400" height="300" autoplay></video><br>
+  <div class="controls">
+    <button onclick="captureAndConvert()">🔍 Capture & Convert</button>
+    <button class="toggle-btn" onclick="toggleCamera()">🔄</button>
+  </div>
+  <canvas id="canvas" width="400" height="300" style="display: none;"></canvas>
+  <div id="output">Braille output will appear here</div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const output = document.getElementById('output');
+    let usingBackCamera = true;
+    let currentStream;
+
+    function startCamera(facingMode) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      navigator.mediaDevices.getUserMedia({ video: { facingMode } })
+        .then(stream => {
+          currentStream = stream;
+          video.srcObject = stream;
+        })
+        .catch(err => {
+          console.error('Camera error:', err);
+          alert('Could not access camera.');
+        });
+    }
+
+    function toggleCamera() {
+      usingBackCamera = !usingBackCamera;
+      startCamera(usingBackCamera ? { exact: 'environment' } : 'user');
+    }
+
+    // Start with back camera by default
+    startCamera({ exact: 'environment' });
+
+    const brailleMap = {
+      a: '⠁', b: '⠃', c: '⠉', d: '⠙', e: '⠑', f: '⠋',
+      g: '⠛', h: '⠓', i: '⠊', j: '⠚', k: '⠅', l: '⠇',
+      m: '⠍', n: '⠝', o: '⠕', p: '⠏', q: '⠟', r: '⠗',
+      s: '⠎', t: '⠞', u: '⠥', v: '⠧', w: '⠺', x: '⠭',
+      y: '⠽', z: '⠵', ' ': ' '
+    };
+
+    function convertToBraille(text) {
+      return text.toLowerCase().split('').map(char => brailleMap[char] || '').join('');
+    }
+
+    function speakText(text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utterance);
+    }
+
+    function captureAndConvert() {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      Tesseract.recognize(canvas, 'eng', { logger: m => console.log(m) })
+        .then(({ data: { text } }) => {
+          console.log('Detected text:', text);
+          const braille = convertToBraille(text);
+          output.innerText = `Braille: ${braille}`;
+          speakText(braille);
+        })
+        .catch(err => console.error('OCR Error:', err));
+    }
+  </script>
+</body>
+</html>
